@@ -16,13 +16,15 @@ std::vector<int> ipc_read(int control)
     int* arr = (int*)shmat(shmid, (void*)0, 0);
 
     //공유메모리로부터 받을 값 저장을 위한 벡터 생성
-    std::vector<int> value(2);
+    std::vector<int> value(3);
     //공유메모리 저장되어있는 값을 새 벡터에 복사
-    for(int i=0; i<2; i++)
+    for(int i=0; i<3; i++)
         value[i] = arr[i];
     
-    if(control=1)
+    if(control==1)
         arr[2]=1;
+    if(control==0)
+        arr[2]=0;
     
     shmdt(arr);
     //새 백터 리턴
@@ -56,7 +58,7 @@ int main(int argc, char *argv[])
     while(1)
     {
     // 공유메모리 값  가져오기
-    auto sns_value = ipc_read(0);
+    auto sns_value = ipc_read(3);
     
     // 센서 데이터 입력
     uint16_t sensor_temperature = sns_value[0];
@@ -84,9 +86,11 @@ int main(int argc, char *argv[])
     std::cout << "Control code received from server: " << control_code << std::endl;
     if(control_code == 1){
         ipc_read(1);
-        break;
+        std::cout<< "send gpio 1 to relay"<<std::endl;
     }
-
+    else
+        ipc_read(0);
+   
     sleep(1);
     }
 

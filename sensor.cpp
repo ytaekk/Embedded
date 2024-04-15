@@ -79,7 +79,7 @@ std::vector<int> read_dht_data(int size)
     
 }
 
-void ipc_func(int humi, int temp)
+void ipc_func(int humi, int temp) //센서로 부터 값을 받아 인자로 입력
 {
     // ftok to generate unique key
     key_t key = ftok("shmfile", 65);
@@ -90,9 +90,10 @@ void ipc_func(int humi, int temp)
     // shmat to attach to shared memory
     int* arr = (int*)shmat(shmid, (void*)0, 0);
 
+    // IPC 공유메모리 배열에 값 저장.
     arr[0] = humi;
     arr[1] = temp;
-
+    arr[2] = 0;
     shmdt(arr);
 }
 
@@ -109,7 +110,7 @@ int main()
     {
         std::cout<<".. ";
         
-        auto sns_value = read_dht_data(2);
+        auto sns_value = read_dht_data(3);
         if(sns_value.size()>=2 && sns_value[0]>0){
             std::cout<<std::endl;
             std::cout << " humidity : " << sns_value[0] << " temp : " << sns_value[1] << std::endl;
