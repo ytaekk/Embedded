@@ -2,37 +2,14 @@
 #include<iostream>
 #include<modbus.h>
 #include<unistd.h>
-
-//ipc
-#include <stdio.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <vector>
-
-std::vector<int> ipc_read(int control)
-{
-    key_t key = ftok("shmfile", 65);
-    int shmid = shmget(key, sizeof(int)*5, 0666 | IPC_CREAT);
-    int* arr = (int*)shmat(shmid, (void*)0, 0);
-
-    //공유메모리로부터 받을 값 저장을 위한 벡터 생성
-    std::vector<int> value(3);
-    //공유메모리 저장되어있는 값을 새 벡터에 복사
-    for(int i=0; i<3; i++)
-        value[i] = arr[i];
-    
-    if(control==1)
-        arr[2]=1;
-    if(control==0)
-        arr[2]=0;
-    
-    shmdt(arr);
-    //새 백터 리턴
-    return value;
-}
+//ipc
+#include "ipc.h"
 
 int main(int argc, char *argv[])
 {
+    IPC ipc("shmfile", 65, 5);
+
     // 0. Set Server IP and Port, 502: Tcp/Ip
     const char *ip = "192.168.219.110";
     int port = 502;
@@ -57,40 +34,38 @@ int main(int argc, char *argv[])
 
     while(1)
     {
-    // 공유메모리 값  가져오기
-    auto sns_value = ipc_read(3);
-    
     // 센서 데이터 입력
-    uint16_t sensor_temperature = sns_value[0];
+    uint16_t sns_humid = ipc.read(0);
     
     // Write temperature to the server
-    int rc = modbus_write_register(ctx, 0, sensor_temperature);
+    int rc = modbus_write_register(ctx, 0, sns_humid);
     
     if (rc == -1) {
-        std::cerr << "Temperature write failed: " << modbus_strerror(errno) << std::endl;
+        std::cerr << "Humid write failed: " << modbus_strerror(errno) << std::endl;
         modbus_close(ctx);
         modbus_free(ctx);
         return -1;
     }
-    std::cout << "Temperature " << sensor_temperature << " degrees Celsius sent to server." << std::endl;
+    std::cout << "Data send [ Humid : " << sns_humid << " ] to WINDOW SERVER." << std::endl;
 
     // Read GPIO code from SERVER
-    uint16_t control_code;
-    rc = modbus_read_registers(ctx, 1, 1, &control_code); // Assume control code is stored at register 1
+    uint16_t control_code = ipc.read(2);
+    rc = modbus_read_registers(ctx, 2, 1, &control_code); // (context, start regi addr, number of read, )
     if (rc == -1) {
-        std::cerr << "Read control code failed: " << modbus_strerror(errno) << std::endl;
+        std::cerr << "Read Relay Control code failed: " << modbus_strerror(errno) << std::endl;
         modbus_close(ctx);
         modbus_free(ctx);
         return -1;
     }
-    std::cout << "Control code received from server: " << control_code << std::endl;
+
     if(control_code == 1){
-        ipc_read(1);
-        std::cout<< "send gpio 1 to relay"<<std::endl;
+        std::cout << "Data Received [ Relay Control code : " << control_code << " ]"<<std::endl;
+        ipc.write(2,1);  // write for send to Relay on Linux
+        std::cout<< "Data send [ Relay Control code 1 to Relay ]"<<std::endl;
     }
     else
-        ipc_read(0);
-   
+        ipc.write(2,0);
+    
     sleep(1);
     }
 
